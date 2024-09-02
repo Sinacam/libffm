@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -Wall -O3 -std=c++0x -march=native
+CXXFLAGS = -Wall -O3 -std=c++17 -march=native
 
 # comment the following flags if you do not want to SSE instructions
 DFLAG += -DUSESSE

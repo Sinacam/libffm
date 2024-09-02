@@ -619,6 +619,7 @@ namespace ffm
         cout << endl;
 
         Timer timer;
+        default_random_engine rng{42};
 
         auto one_epoch = [&](problem_on_disk& prob, bool do_update)
         {
@@ -626,14 +627,14 @@ namespace ffm
 
             vector<ffm_int> outer_order(prob.meta.num_blocks);
             iota(outer_order.begin(), outer_order.end(), 0);
-            random_shuffle(outer_order.begin(), outer_order.end());
+            shuffle(outer_order.begin(), outer_order.end(), rng);
             for(auto blk : outer_order)
             {
                 ffm_int l = prob.load_block(blk);
 
                 vector<ffm_int> inner_order(l);
                 iota(inner_order.begin(), inner_order.end(), 0);
-                random_shuffle(inner_order.begin(), inner_order.end());
+                shuffle(inner_order.begin(), inner_order.end(), rng);
 
 #if defined USEOMP
 #pragma omp parallel for schedule(static) reduction(+ : loss)
