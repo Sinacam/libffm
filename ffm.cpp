@@ -627,9 +627,10 @@ namespace ffm
         if(log.good())
             log << "epoch,global_step,epoch_step,epoch_accumulated_loss\n";
 
-        int64_t step = 0, epoch = 0;
+        int64_t global_step = 0, epoch = 0;
         auto one_epoch = [&](problem_on_disk& prob, bool do_update)
         {
+            int64_t epoch_step = 0;
             ffm_double loss = 0;
 
             vector<ffm_int> outer_order(prob.meta.num_blocks);
@@ -643,16 +644,16 @@ namespace ffm
                 iota(inner_order.begin(), inner_order.end(), 0);
                 shuffle(inner_order.begin(), inner_order.end(), rng);
 
-                ffm_int accum_ii = 0;
+                ffm_int last_ii = 0;
                 constexpr int logs_per_block = 10;
                 int64_t log_interval = l / logs_per_block;
                 for(int logi = 1; logi < logs_per_block + 2; logi++)
                 {
-                    auto log_step = std::min(logi * log_interval, int64_t(l));
+                    auto log_ii = std::min(logi * log_interval, int64_t(l));
 #if defined USEOMP
 #pragma omp parallel for schedule(static) reduction(+ : loss)
 #endif
-                    for(ffm_int ii = accum_ii; ii < log_step; ii++)
+                    for(ffm_int ii = last_ii; ii < log_ii; ii++)
                     {
                         ffm_int i = inner_order[ii];
                         ffm_float y = prob.Y[i];
@@ -673,16 +674,19 @@ namespace ffm
                                 param.lambda, true);
                         }
                     }
-                    accum_ii = log_step;
+                    last_ii = log_ii;
 
                     if(do_update)
                     {
-                        log << epoch << "," << step + log_step << ","
-                            << log_step << "," << loss << std::endl;
+                        log << epoch << "," << global_step + last_ii << ","
+                            << epoch_step + last_ii << "," << loss << std::endl;
                     }
                 }
                 if(do_update)
-                    step += l;
+                {
+                    global_step += l;
+                    epoch_step += l;
+                }
             }
             if(do_update)
                 epoch += 1;
