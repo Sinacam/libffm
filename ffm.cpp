@@ -589,7 +589,7 @@ namespace ffm
     }
 
     ffm_model ffm_train_on_disk(string tr_path, string va_path,
-                                ffm_parameter param)
+                                ffm_parameter param, string log_path)
     {
 
         problem_on_disk tr(tr_path);
@@ -621,6 +621,13 @@ namespace ffm
         Timer timer;
         default_random_engine rng{42};
 
+        ofstream log{log_path};
+        if(log_path != "" && !log.good())
+            throw runtime_error("cannot open " + log_path);
+        if(log.good())
+            log << "epoch,global_step,epoch_accumulated_loss\n";
+
+        int64_t step = 0, epoch = 0;
         auto one_epoch = [&](problem_on_disk& prob, bool do_update)
         {
             ffm_double loss = 0;
@@ -636,37 +643,51 @@ namespace ffm
                 iota(inner_order.begin(), inner_order.end(), 0);
                 shuffle(inner_order.begin(), inner_order.end(), rng);
 
+                ffm_int accum_ii = 0;
+                constexpr int logs_per_block = 10;
+                int64_t log_interval = l / logs_per_block;
+                for(int logi = 1; logi < logs_per_block + 2; logi++)
+                {
+                    auto log_step = std::min(logi * log_interval, int64_t(l));
 #if defined USEOMP
 #pragma omp parallel for schedule(static) reduction(+ : loss)
 #endif
-                for(ffm_int ii = 0; ii < l; ii++)
-                {
-                    ffm_int i = inner_order[ii];
+                    for(ffm_int ii = accum_ii; ii < log_step; ii++)
+                    {
+                        ffm_int i = inner_order[ii];
+                        ffm_float y = prob.Y[i];
 
-                    ffm_float y = prob.Y[i];
+                        ffm_node* begin = &prob.X[prob.P[i]];
+                        ffm_node* end = &prob.X[prob.P[i + 1]];
 
-                    ffm_node* begin = &prob.X[prob.P[i]];
+                        ffm_float r = param.normalization ? prob.R[i] : 1;
+                        ffm_double t = wTx(begin, end, r, model);
+                        ffm_double expnyt = exp(-y * t);
 
-                    ffm_node* end = &prob.X[prob.P[i + 1]];
+                        loss += log1p(expnyt);
 
-                    ffm_float r = param.normalization ? prob.R[i] : 1;
-
-                    ffm_double t = wTx(begin, end, r, model);
-
-                    ffm_double expnyt = exp(-y * t);
-
-                    loss += log1p(expnyt);
+                        if(do_update)
+                        {
+                            ffm_float kappa = -y * expnyt / (1 + expnyt);
+                            wTx(begin, end, r, model, kappa, param.eta,
+                                param.lambda, true);
+                        }
+                    }
+                    accum_ii = log_step;
 
                     if(do_update)
                     {
-
-                        ffm_float kappa = -y * expnyt / (1 + expnyt);
-
-                        wTx(begin, end, r, model, kappa, param.eta,
-                            param.lambda, true);
+                        char buf[100];
+                        snprintf(buf, sizeof(buf), "%ld,%ld,%f", epoch,
+                                 step + log_step, loss);
+                        log << buf << std::endl;
                     }
                 }
+                if(do_update)
+                    step += l;
             }
+            if(do_update)
+                epoch += 1;
 
             return loss / prob.meta.l;
         };
