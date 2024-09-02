@@ -691,7 +691,13 @@ namespace ffm
 
                 if(auto_stop)
                 {
-                    if(va_loss > best_va_loss)
+                    if(va_loss < best_va_loss)
+                    {
+                        memcpy(prev_W.data(), model.W,
+                               w_size * sizeof(ffm_float));
+                        best_va_loss = va_loss;
+                    }
+                    else
                     {
                         memcpy(model.W, prev_W.data(),
                                w_size * sizeof(ffm_float));
@@ -699,12 +705,6 @@ namespace ffm
                              << "Auto-stop. Use model at " << iter - 1
                              << "th iteration." << endl;
                         break;
-                    }
-                    else
-                    {
-                        memcpy(prev_W.data(), model.W,
-                               w_size * sizeof(ffm_float));
-                        best_va_loss = va_loss;
                     }
                 }
             }
