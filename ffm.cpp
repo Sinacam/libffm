@@ -625,7 +625,7 @@ namespace ffm
         if(log_path != "" && !log.good())
             throw runtime_error("cannot open " + log_path);
         if(log.good())
-            log << "epoch,global_step,epoch_accumulated_loss\n";
+            log << "epoch,global_step,epoch_step,epoch_accumulated_loss\n";
 
         int64_t step = 0, epoch = 0;
         auto one_epoch = [&](problem_on_disk& prob, bool do_update)
@@ -677,10 +677,8 @@ namespace ffm
 
                     if(do_update)
                     {
-                        char buf[100];
-                        snprintf(buf, sizeof(buf), "%ld,%ld,%f", epoch,
-                                 step + log_step, loss);
-                        log << buf << std::endl;
+                        log << epoch << "," << step + log_step << ","
+                            << log_step << "," << loss << std::endl;
                     }
                 }
                 if(do_update)
