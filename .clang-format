@@ -1,0 +1,10 @@
+BasedOnStyle: LLVM
+UseTab: Never
+AllowShortCaseLabelsOnASingleLine: true
+AlwaysBreakTemplateDeclarations: true
+IndentWidth: 4
+TabWidth: 4
+BreakBeforeBraces: Allman
+NamespaceIndentation: All
+PointerAlignment: Left
+SpaceBeforeParens: Never
